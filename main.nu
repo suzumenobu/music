@@ -19,19 +19,14 @@ def main [url: string, thumbnail: string] {
            if ($output_path | path exists) {
               log info $'[($entry.title)] already downloaded'
            } else {
-             yt-dlp --embed-metadata --embed-thumbnail -x --audio-format mp3 $entry.id -o $output_path out> /dev/null err> /dev/null
+             download_track $entry.id $output_path
              log info $'[($entry.title)] downloaded'
            }
          }
     log info "Playlist audio tracks ready to merge"
 
     let ffmpeg_tracks_list = 'playlist.txt'
-    $playlist
-        | get entries
-        | each { |entry| $'file ($env.MUSIC_SOURCE_DIR)/(map_playlist_entry_to_path $entry)'}
-        | to text
-        | save --force $ffmpeg_tracks_list
-
+    map_yt_playlist_to_ffmpeg_track_list $playlist | save --force $ffmpeg_tracks_list
 
     log info "Merging playlist audio tracks"
     let playlist_path = $'($playlist.title).mp3'
@@ -57,10 +52,21 @@ def main [url: string, thumbnail: string] {
 }
 
 def fetch_playlist [url: string] {
-    yt-dlp --flat-playlist --dump-single-json $url
+  yt-dlp --flat-playlist --dump-single-json $url
         | from json
 }
 
-def map_playlist_entry_to_path [$entry: record] {
+def download_track [id: string, output: string] {
+  yt-dlp --embed-metadata --embed-thumbnail -x --audio-format mp3 $id -o $output out> /dev/null err> /dev/null  
+}
+
+def map_playlist_entry_to_path [entry: record] {
   echo $'($entry.id).mp3'
+}
+
+def map_yt_playlist_to_ffmpeg_track_list [playlist: record] {
+    $playlist
+        | get entries
+        | each { |entry| $'file ($env.MUSIC_SOURCE_DIR)/(map_playlist_entry_to_path $entry)'}
+        | to text
 }
