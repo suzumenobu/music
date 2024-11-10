@@ -51,13 +51,29 @@ def main [url: string, thumbnail: string] {
     log info "Temp files cleared"
 }
 
+def "main timecodes" [url: string] {
+  let playlist = fetch_playlist $url
+
+  mut total_duration = 0
+  mut result = []
+
+  for entry in ($playlist | get entries) {
+    let start = $total_duration
+    let end = $total_duration + $entry.duration
+    $total_duration = $end
+    $result = ($result | append {start: (seconds-to-hms $start), end: (seconds-to-hms $end), title: $entry.title})
+  }
+
+  $result | each {|row| $"($row.start) - ($row.end): ($row.title)"} | to text
+}
+
 def fetch_playlist [url: string] {
   yt-dlp --flat-playlist --dump-single-json $url
         | from json
 }
 
 def download_track [id: string, output: string] {
-  yt-dlp --embed-metadata --embed-thumbnail -x --audio-format mp3 $id -o $output out> /dev/null err> /dev/null  
+  yt-dlp --embed-metadata --embed-thumbnail -x --audio-format mp3 $id -o $output out> /dev/null err> /dev/null
 }
 
 def map_playlist_entry_to_path [entry: record] {
@@ -69,4 +85,14 @@ def map_yt_playlist_to_ffmpeg_track_list [playlist: record] {
         | get entries
         | each { |entry| $'file ($env.MUSIC_SOURCE_DIR)/(map_playlist_entry_to_path $entry)'}
         | to text
+}
+
+def seconds-to-hms [seconds: int] {
+    let align = {|val| $val | fill --alignment right --character '0' --width 2}
+
+    let hours = $seconds // 3600 | each $align
+    let minutes = (($seconds mod 3600) // 60) | each $align
+    let seconds = ($seconds mod 60) | each $align
+
+    echo $'($hours):($minutes):($seconds)'
 }
